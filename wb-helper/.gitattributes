@@ -1,8 +1,0 @@
-# 强制 LF：这些脚本要在 Linux 沙盒里 bash 执行，
-# CRLF 会导致 "bad interpreter: /bin/bash^M"，云端 curl 下来直接跑不起来。
-* text=auto eol=lf
-*.sh  text eol=lf
-*.mjs text eol=lf
-*.md  text eol=lf
-*.json text eol=lf
-*.env text eol=lf
