@@ -318,7 +318,7 @@ bash scripts/sandbox_run.sh                 # 完整跑一次
 不要自行探索接口、不要通读任何文档、不要重复执行。
 
 1) 执行这一条（安装或升级 skill 并自检，约 10~20 秒）：
-   curl -fsSL https://raw.githubusercontent.com/ruilin365/wb-helper/main/bootstrap_bundle.sh -o /tmp/wbbs.sh && bash /tmp/wbbs.sh
+   curl -fsSL https://raw.githubusercontent.com/ruilin365/WorkBuddy-helper/main/bootstrap_bundle.sh -o /tmp/wbbs.sh && bash /tmp/wbbs.sh
    它自己去我的资料库里取最新版本的包安装到 ~/.workbuddy/skills/wb-helper。
    若报错（包括 curl 拿不到文件），原样贴出错误并停止；不要自行找替代下载路径、不要从其他地址安装。
 

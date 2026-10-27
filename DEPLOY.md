@@ -3,7 +3,7 @@
 从零到「云端每天自动领取」，任意一台装了 WorkBuddy 桌面端的电脑都适用。
 命令按 **Windows + Git Bash** 写；macOS 只需把路径换成 `~/.workbuddy/skills`（脚本本身跨平台）。
 
-仓库：`https://github.com/ruilin365/wb-helper`（分支 `main`）
+仓库：`https://github.com/ruilin365/WorkBuddy-helper`（分支 `main`）
 若你的仓库名或分支不同，下文所有 URL 相应替换即可。
 
 ---
@@ -23,9 +23,9 @@
 ## 一、把仓库装到本机 skill 目录
 
 ```bash
-git clone https://github.com/ruilin365/wb-helper.git
+git clone https://github.com/ruilin365/WorkBuddy-helper.git
 mkdir -p ~/.workbuddy/skills
-cp -r wb-helper ~/.workbuddy/skills/wb-helper
+cp -r WorkBuddy-helper ~/.workbuddy/skills/wb-helper
 bash ~/.workbuddy/skills/wb-helper/scripts/check_integrity.sh
 ```
 
@@ -119,7 +119,7 @@ ls -l dist/
 不要自行探索接口、不要通读任何文档、不要重复执行。
 
 1) 执行这一条（安装或升级 skill 并自检，约 10~20 秒）：
-   curl -fsSL https://raw.githubusercontent.com/ruilin365/wb-helper/main/bootstrap_bundle.sh -o /tmp/wbbs.sh && bash /tmp/wbbs.sh
+   curl -fsSL https://raw.githubusercontent.com/ruilin365/WorkBuddy-helper/main/bootstrap_bundle.sh -o /tmp/wbbs.sh && bash /tmp/wbbs.sh
    它自己去我的资料库里取最新版本的包安装到 ~/.workbuddy/skills/wb-helper。
    若报错（包括 curl 拿不到文件），原样贴出错误并停止；不要自行找替代下载路径、不要从其他地址安装。
 

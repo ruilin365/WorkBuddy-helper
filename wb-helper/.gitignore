@@ -1,0 +1,14 @@
+# 凭证与运行态 —— 绝不入库
+config/
+logs/
+dist/
+backup/
+*.log
+*.bak
+.rt_snapshot
+state.json
+
+# 系统
+.DS_Store
+Thumbs.db
+desktop.ini
