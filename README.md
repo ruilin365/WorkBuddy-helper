@@ -39,11 +39,8 @@ https://github.com/ruilin365/WorkBuddy-helper
 
 <img width="463" height="871" alt="image" src="https://github.com/user-attachments/assets/528990e0-70df-4a3c-b43d-0c4f6b4407c1" />
 
-**第 5 步** · 别等第二天。在云端会话里直接发一句：
+**第 5 步** · 别等第二天。在云端会话里点一下测试执行按钮看效果。
 
-```
-执行 bash ~/.workbuddy/skills/wb-helper/scripts/sandbox_run.sh --quiet
-```
 
 回报里出现「签到/打卡/猫猫」三项就说明通了。
 
