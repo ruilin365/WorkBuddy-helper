@@ -11,13 +11,16 @@
 
 **给人看的：**
 
-直接把这个仓库链接丢给桌面端 WorkBuddy ，它会帮你需要的文件上传到你的 WorkBuddy 云端资料库，然后给你一段提示词
+直接把这个仓库链接丢给桌面端 WorkBuddy ，它会帮你需要的文件上传到你的 WorkBuddy 云端资料库，并尝试获取你的登录凭证，这里它会提示你重启 WorkBuddy 
+
+准备工作完成后，它会给你一段提示词
 
 你只需要把提示词复制下来，在小程序或者手机app的云端模式下创建一个定时任务（自定义添加-提示词这里粘贴）即可
 
 注：云端需要在小程序或者手机app里操作，目前桌面端暂无入口
 
 <img width="463" height="871" alt="image" src="https://github.com/user-attachments/assets/528990e0-70df-4a3c-b43d-0c4f6b4407c1" />
+
 
 
 
