@@ -5,9 +5,17 @@
 # 前置: CodeBuddy 沙盒（auth-proxy 网关注入资料库身份）+ python3 + curl
 # 自包含：不依赖 skill 自身任何文件（此脚本存在的意义就是"skill 还不存在"）
 # 安全约束: 只从资料库个人空间取包，sha256 不符即中止；不从任何网络地址安装 skill
+#
+# 修订（bootstrap v2，2026-11-04）：
+#   · 多候选重试：资料库同名上传会新建节点且无删除 API，历史版本必然并存；
+#     同一版本号也可能有多个节点，其中可能有上传不完整/已失效的坏节点。
+#     旧逻辑只认排第一的那个，一旦命中坏节点就整体失败。现在按版本号取前 3 个依次尝试。
+#   · 失败回显原始输出：旧逻辑用 2>/dev/null 吞掉 get_download_link 的报错，
+#     只剩一句"无法解析 download_url"，无法定位。现在打印每个候选的退出码与返回首行。
 set -u
 
 BUNDLE_ID='wb-helper-local-bundle'
+MAX_CANDIDATES=3
 DEST_PARENT="$HOME/.workbuddy/skills"
 if [ "${1:-}" = "--dest" ] && [ -n "${2:-}" ]; then DEST_PARENT="$2"; fi
 
@@ -42,17 +50,26 @@ if [ -z "$CHK" ] || [ "$CHK" = "000" ]; then
   exit 1
 fi
 
-TMP_BUNDLE="$(mktemp)" || { echo "无法创建临时文件" >&2; exit 1; }
-TMP_TGZ="$(mktemp)" || { echo "无法创建临时文件" >&2; exit 1; }
-TMP_DIR="$(mktemp -d)" || { echo "无法创建临时目录" >&2; exit 1; }
+# 临时文件统一优先放 /tmp：Windows 上 mktemp 可能返回
+# C:\Users\...\Temp/tmp.xxx 这种混合路径，GNU tar 的 -C 处理不了（会报 Cannot open）。
+TMP_BUNDLE="$(mktemp /tmp/wbbsb.XXXXXX 2>/dev/null || mktemp)" || { echo "无法创建临时文件" >&2; exit 1; }
+TMP_TGZ="$(mktemp /tmp/wbbst.XXXXXX 2>/dev/null || mktemp)" || { echo "无法创建临时文件" >&2; exit 1; }
+TMP_DIR="$(mktemp -d /tmp/wbbsd.XXXXXX 2>/dev/null || mktemp -d)" || { echo "无法创建临时目录" >&2; exit 1; }
 cleanup() { rm -f "$TMP_BUNDLE" "$TMP_TGZ"; rm -rf "$TMP_DIR"; }
 trap cleanup EXIT
 
-# 第 1 步：定位节点（list-nodes + 标题匹配，递归 1 层 folder）
-NID=$("$PY" - "$LB" "$BUNDLE_ID" <<'PYEOF'
+# Windows 版 GNU tar（msys/MinGW）会把 C:/... 当成远程主机名而报
+# "Cannot connect to C:"；Linux 沙盒不需要这个开关，也不能无条件加（BusyBox tar 不认）。
+TAR_FORCE_LOCAL=""
+case "$(uname -s 2>/dev/null || echo unknown)" in
+  MINGW*|MSYS*|CYGWIN*) TAR_FORCE_LOCAL="--force-local" ;;
+esac
+
+# 第 1 步：定位节点（list-nodes + 标题匹配，递归 1 层 folder），输出前 N 个候选 nodeId
+NID_LIST=$("$PY" - "$LB" "$BUNDLE_ID" "$MAX_CANDIDATES" <<'PYEOF'
 import json, os, subprocess, sys
 
-lb, ident = sys.argv[1], sys.argv[2]
+lb, ident, maxc = sys.argv[1], sys.argv[2], int(sys.argv[3])
 api = os.path.join(lb, "space_api.py")
 
 
@@ -119,60 +136,131 @@ def _vkey(n):
 
 
 hits.sort(key=_vkey, reverse=True)
+top = hits[:maxc]
 if len(hits) > 1:
-    sys.stderr.write("WARN: 匹配到 %d 个 skill 包节点，已取版本最新者「%s」\n"
-                     % (len(hits), hits[0].get("title")))
-print(hits[0].get("id") or "")
+    sys.stderr.write("WARN: 匹配到 %d 个节点，按版本取前 %d 个候选：\n" % (len(hits), len(top)))
+    for n in top:
+        sys.stderr.write("       - %s  node=%s\n" % (n.get("title"), n.get("id")))
+for n in top:
+    nid = n.get("id") or ""
+    if nid:
+        print(nid)
 PYEOF
 )
 RC=$?
-if [ "$RC" -ne 0 ] || [ -z "$NID" ]; then
-  echo "==> 定位资料库中的 skill 包失败（请确认「${BUNDLE_ID}.txt」已上传到个人空间根目录）" >&2
+if [ "$RC" -ne 0 ] || [ -z "$NID_LIST" ]; then
+  echo "==> 定位资料库中的 skill 包失败（请确认「${BUNDLE_ID}」已上传到个人空间根目录）" >&2
   exit 1
 fi
 
-# 第 2 步：取下载链接（只解析第一行 KS_DRIVE_DOWNLOAD）
-DLINK_OUTPUT=$("$PY" "$LB/drive/get_download_link.py" --node-id "$NID" 2>/dev/null) || {
-  echo "==> get_download_link 失败（node-id: ${NID}）" >&2
-  exit 1
+# 第 2~5 步：逐个候选尝试（取链接 → 下载 → 校验 → 解包），第一个成功的即采用
+LAST_ERR=""
+BUNDLE_VER=""
+
+try_install_from() {
+  local nid="$1" out rc first url meta exp got src
+  out=$("$PY" "$LB/drive/get_download_link.py" --node-id "$nid" 2>&1)
+  rc=$?
+  first=$(printf '%s\n' "$out" | head -1)
+
+  # 首行形如 `KS_DRIVE_DOWNLOAD {"download_url": "..."}`；不是这个形态说明接口返回异常
+  url=$(printf '%s' "$first" | sed 's/^KS_DRIVE_DOWNLOAD //' | "$PY" -c '
+import sys, json
+raw = sys.stdin.read().strip()
+try:
+    print(json.loads(raw).get("download_url") or "")
+except Exception:
+    print("")
+' 2>/dev/null)
+  if [ -z "$url" ]; then
+    LAST_ERR="get_download_link 退出码=${rc}，首行(前 160 字符)=$(printf '%s' "$first" | head -c 160)"
+    return 1
+  fi
+
+  # COS 临时签名有时效，拿到链接立即下载
+  : > "$TMP_BUNDLE"
+  if ! curl -sSL --max-time 60 -o "$TMP_BUNDLE" "$url"; then
+    LAST_ERR="curl 下载失败（签名可能已过期）"
+    return 1
+  fi
+  if [ ! -s "$TMP_BUNDLE" ]; then
+    LAST_ERR="下载内容为空（节点可能是空文件或上传未完成）"
+    return 1
+  fi
+
+  meta="$(head -1 "$TMP_BUNDLE" | tr -d '\r')"
+  case "$meta" in
+    WBHELPER-BUNDLE*) : ;;
+    *)
+      LAST_ERR="首行不是 bundle 元信息（首行前 100 字符=$(printf '%s' "$meta" | head -c 100)）"
+      return 1
+      ;;
+  esac
+
+  exp="$(printf '%s' "$meta" | sed -n 's/.*sha256=\([0-9a-fA-F]\{64\}\).*/\1/p')"
+  if [ -n "$exp" ]; then
+    : > "$TMP_TGZ"
+    tail -n +2 "$TMP_BUNDLE" | tr -d '\r\n' | base64 -d > "$TMP_TGZ" 2>/dev/null || true
+    if [ ! -s "$TMP_TGZ" ]; then
+      LAST_ERR="base64 解码失败或为空（包文件可能被截断）"
+      return 1
+    fi
+    got="$(sha256sum < "$TMP_TGZ" | awk '{print $1}')"
+    if [ "$got" != "$exp" ]; then
+      LAST_ERR="sha256 校验失败（期望 ${exp:0:16}…）"
+      return 1
+    fi
+  else
+    echo "    WARN: 元信息缺少 sha256，跳过校验" >&2
+  fi
+
+  # 解包到临时目录，确认结构后再合并，避免半截安装；每换一个候选都重建空目录
+  rm -rf "$TMP_DIR"
+  mkdir -p "$TMP_DIR" || { LAST_ERR="无法重建临时目录"; return 1; }
+  if ! tar $TAR_FORCE_LOCAL -xzf "$TMP_TGZ" -C "$TMP_DIR"; then
+    LAST_ERR="tar 解包失败"
+    return 1
+  fi
+  src="$TMP_DIR/wb-helper"
+  if [ ! -d "$src" ]; then
+    LAST_ERR="包内缺少 wb-helper/ 目录（包结构异常）"
+    return 1
+  fi
+
+  mkdir -p "$DEST_PARENT/wb-helper" || { LAST_ERR="无法创建目标目录"; return 1; }
+  if ! cp -a "$src/." "$DEST_PARENT/wb-helper/"; then
+    LAST_ERR="复制到目标目录失败"
+    return 1
+  fi
+  chmod +x "$DEST_PARENT/wb-helper/scripts/"*.sh 2>/dev/null || true
+
+  BUNDLE_VER="$(printf '%s' "$meta" | sed -n 's/.*version=\([^ ]*\).*/\1/p')"
+  return 0
 }
-URL=$(printf '%s\n' "$DLINK_OUTPUT" | head -1 | sed 's/^KS_DRIVE_DOWNLOAD //' \
-  | "$PY" -c 'import sys,json; print(json.load(sys.stdin).get("download_url",""))' 2>/dev/null) || URL=""
-[ -n "$URL" ] || { echo "==> 无法解析 download_url" >&2; exit 1; }
 
-# 第 3 步：立即下载（COS 临时签名有时效）
-curl -sSL --max-time 60 -o "$TMP_BUNDLE" "$URL" || { echo "==> 下载失败" >&2; exit 1; }
-[ -s "$TMP_BUNDLE" ] || { echo "==> 下载内容为空" >&2; exit 1; }
+OK=0
+USED_NID=""
+FAILS=""
+for nid in $NID_LIST; do
+  echo "==> 尝试节点 ${nid}" >&2
+  if try_install_from "$nid"; then
+    OK=1
+    USED_NID="$nid"
+    break
+  fi
+  echo "    失败：${LAST_ERR}" >&2
+  FAILS="${FAILS}    - node ${nid}: ${LAST_ERR}
+"
+done
 
-# 第 4 步：解析元信息并校验 sha256
-META="$(head -1 "$TMP_BUNDLE" | tr -d '\r')"
-case "$META" in
-  WBHELPER-BUNDLE*) : ;;
-  *) echo "==> 首行不是 bundle 元信息，文件不匹配（首行：$(printf '%s' "$META" | head -c 100)）" >&2; exit 1 ;;
-esac
-VER="$(printf '%s' "$META" | sed -n 's/.*version=\([^ ]*\).*/\1/p')"
-EXP="$(printf '%s' "$META" | sed -n 's/.*sha256=\([0-9a-fA-F]\{64\}\).*/\1/p')"
-[ -n "$EXP" ] || { echo "==> 元信息缺少 sha256，拒绝解包" >&2; exit 1; }
-
-tail -n +2 "$TMP_BUNDLE" | tr -d '\r\n' | base64 -d > "$TMP_TGZ" 2>/dev/null || true
-[ -s "$TMP_TGZ" ] || { echo "==> base64 解码失败或为空" >&2; exit 1; }
-
-GOT="$(sha256sum < "$TMP_TGZ" | awk '{print $1}')"
-if [ "$GOT" != "$EXP" ]; then
-  echo "==> sha256 校验失败，已中止解包" >&2
-  echo "    期望: $EXP" >&2
-  echo "    实际: $GOT" >&2
+if [ "$OK" -ne 1 ]; then
+  echo "==> 所有候选节点都取不到可用的安装包" >&2
+  printf '%s' "$FAILS" >&2
+  echo "==> 原因可能是：节点上传不完整 / 已被删除 / 与版本号不匹配" >&2
+  echo "==> 处置：在本机重新 bash scripts/pack_bundle.sh 并上传新 bundle（文件名带更大版本号）" >&2
   exit 1
 fi
 
-# 第 5 步：解包（先解到临时目录，确认结构后再合并，避免半截安装）
-tar -xzf "$TMP_TGZ" -C "$TMP_DIR" || { echo "==> tar 解包失败" >&2; exit 1; }
-SRC="$TMP_DIR/wb-helper"
-[ -d "$SRC" ] || { echo "==> 包内缺少 wb-helper/ 目录" >&2; exit 1; }
-
-mkdir -p "$DEST_PARENT/wb-helper" || { echo "无法创建目标目录" >&2; exit 1; }
-cp -a "$SRC/." "$DEST_PARENT/wb-helper/" || { echo "==> 复制失败" >&2; exit 1; }
-chmod +x "$DEST_PARENT/wb-helper/scripts/"*.sh 2>/dev/null || true
-
-echo "==> 安装完成：version=${VER:-未知} → $DEST_PARENT/wb-helper"
+echo "==> 安装完成：version=${BUNDLE_VER:-未知} → $DEST_PARENT/wb-helper"
+echo "==> 使用节点：${USED_NID}"
 echo "==> 下一步：bash $DEST_PARENT/wb-helper/scripts/check_integrity.sh"
