@@ -1,4 +1,4 @@
-# wb-helper · WorkBuddy 每日领取自动化（本地加固分支）
+# wb-helper · WorkBuddy 每日领取云端自动化
 
 给**一个账号**做 WorkBuddy 每日自动领取：签到、打卡、猫猫旅行（派出/领取）、奖励只读查询。
 本机负责取凭证，云端沙盒负责每天自动跑，凭证经资料库跨实例持久化。
@@ -12,6 +12,11 @@
 换一台电脑从零复现，看 **[DEPLOY.md](DEPLOY.md)**，照抄命令即可。
 
 已有装好的机器，只想升级云端，看 DEPLOY.md 的「六、版本升级」。
+
+注：云端需要在小程序或者手机app里操作，目前桌面端暂无入口
+
+<img width="463" height="871" alt="image" src="https://github.com/user-attachments/assets/528990e0-70df-4a3c-b43d-0c4f6b4407c1" />
+
 
 ---
 
