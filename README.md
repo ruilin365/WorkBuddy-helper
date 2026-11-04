@@ -14,6 +14,7 @@
 已有装好的机器，只想升级云端，看 DEPLOY.md 的「六、版本升级」。
 
 注：云端需要在小程序或者手机app里操作，目前桌面端暂无入口
+
 <img width="463" height="871" alt="image" src="https://github.com/user-attachments/assets/528990e0-70df-4a3c-b43d-0c4f6b4407c1" />
 
 
