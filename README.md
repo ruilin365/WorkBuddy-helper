@@ -9,7 +9,7 @@
 
 ## 快速开始
 
-给人看的：
+**给人看的：**
 
 直接把这个仓库链接丢给桌面端 WorkBuddy ，它会帮你需要的文件上传到你的 WorkBuddy 云端资料库，然后给你一段提示词
 
@@ -20,7 +20,8 @@
 <img width="463" height="871" alt="image" src="https://github.com/user-attachments/assets/528990e0-70df-4a3c-b43d-0c4f6b4407c1" />
 
 
-给 WorkBuddy 看的：
+
+**给 WorkBuddy 看的：**
 
 换一台电脑从零复现，看 **[DEPLOY.md](DEPLOY.md)**。
 
