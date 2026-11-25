@@ -80,11 +80,14 @@ https://raw.githubusercontent.com/ruilin365/WorkBuddy-helper/112dfe9c8e5a658b9a6
 
 ### A-3 改定时任务提示词
 
-打开 05:00 和 13:00 两个**现有**任务，把第 1 步那行换成：
+打开 05:00 和 13:00 两个**现有**任务，把第 1 步那两行换成（把 `<你的SHA>` 换成你刚复制的 SHA，两处都换）：
 
 ```
-   curl -fsSL https://raw.githubusercontent.com/ruilin365/WorkBuddy-helper/<你的SHA>/bootstrap_bundle.sh -o /tmp/wbbs.sh && bash /tmp/wbbs.sh
+   ( curl -fsSL --max-time 25 --retry 1 https://raw.githubusercontent.com/ruilin365/WorkBuddy-helper/<你的SHA>/bootstrap_bundle.sh -o /tmp/wbbs.sh && bash -n /tmp/wbbs.sh ) || ( curl -fsSL --max-time 60 https://codeload.github.com/ruilin365/WorkBuddy-helper/tar.gz/<你的SHA> | tar -xz -O --wildcards '*/bootstrap_bundle.sh' --exclude='*/scripts/*' > /tmp/wbbs.sh )
+   bash /tmp/wbbs.sh
 ```
+
+> 两行一起执行。第一行走 raw 地址，不通时（如 `502`）自动改用 codeload 打包地址取同一个文件。
 
 **优点**：两分钟搞定，内容立刻固定下来。
 **缺点**：仓库还在别人名下，虽然内容锁死了。
@@ -119,21 +122,19 @@ https://github.com/<你的用户名>/WorkBuddy-helper
 
 ### B-4 改定时任务提示词
 
-打开 05:00 和 13:00 两个**现有**任务（不要新建），把第 1 步那行换成：
+打开 05:00 和 13:00 两个**现有**任务（不要新建），把第 1 步那两行换成（`<你的用户名>` 两处都换）：
 
 ```
-   curl -fsSL https://raw.githubusercontent.com/<你的用户名>/WorkBuddy-helper/main/bootstrap_bundle.sh -o /tmp/wbbs.sh && bash /tmp/wbbs.sh
+   ( curl -fsSL --max-time 25 --retry 1 https://raw.githubusercontent.com/<你的用户名>/WorkBuddy-helper/main/bootstrap_bundle.sh -o /tmp/wbbs.sh && bash -n /tmp/wbbs.sh ) || ( curl -fsSL --max-time 60 https://codeload.github.com/<你的用户名>/WorkBuddy-helper/tar.gz/refs/heads/main | tar -xz -O --wildcards '*/bootstrap_bundle.sh' --exclude='*/scripts/*' > /tmp/wbbs.sh )
+   bash /tmp/wbbs.sh
 ```
 
 只改 `<你的用户名>` 这一段，其余一字不动。
 
 ### B-5（可选但推荐）再锁一层 commit
 
-想再稳一层，在 B-4 基础上把 `main` 再换成你自己的 commit SHA，取法见「A-1」，地址换成：
-
-```
-https://raw.githubusercontent.com/<你的用户名>/WorkBuddy-helper/<你的SHA>/bootstrap_bundle.sh
-```
+想再稳一层，在 B-4 基础上把你刚写进去的 `main` 换成自己的 commit SHA（取法见「A-1」），
+**两处地址都要换**：raw 那段的路径末段、codeload 那段的 `tar.gz/<你的SHA>`。
 
 这样连你自己误操作改坏仓库都不影响云端。
 

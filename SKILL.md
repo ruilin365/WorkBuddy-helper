@@ -318,12 +318,13 @@ bash scripts/sandbox_run.sh                 # 完整跑一次
 为我本人这一个账号执行 WorkBuddy 每日领取，只领不兑换。严格按下面三步做，做完回报一次，
 不要自行探索接口、不要通读任何文档、不要重复执行。
 
-1) 执行这一条（安装或升级 skill 并自检，约 10~20 秒）：
-   curl -fsSL https://raw.githubusercontent.com/ruilin365/WorkBuddy-helper/main/bootstrap_bundle.sh -o /tmp/wbbs.sh && bash /tmp/wbbs.sh
-   （这一行的 GitHub 地址可以换成自己的 fork，或把 main 换成 40 位 commit SHA 锁死版本，
-     见仓库根目录 FORK.md。除这一行外其余不动。）
-   它自己去我的资料库里取最新版本的包安装到 ~/.workbuddy/skills/wb-helper。
-   若报错（包括 curl 拿不到文件），原样贴出错误并停止；不要自行找替代下载路径、不要从其他地址安装。
+1) 执行下面两条命令，安装或升级 skill 并自检（约 10~30 秒）：
+   ( curl -fsSL --max-time 25 --retry 1 https://raw.githubusercontent.com/ruilin365/WorkBuddy-helper/main/bootstrap_bundle.sh -o /tmp/wbbs.sh && bash -n /tmp/wbbs.sh ) || ( curl -fsSL --max-time 60 https://codeload.github.com/ruilin365/WorkBuddy-helper/tar.gz/refs/heads/main | tar -xz -O --wildcards '*/bootstrap_bundle.sh' --exclude='*/scripts/*' > /tmp/wbbs.sh )
+   bash /tmp/wbbs.sh
+   （第一行优先 raw，不通（如 502）自动改用 codeload 取同一个文件；两条一起执行。其中的仓库地址
+     可以换成自己的 fork，或把 main 换成 40 位 commit SHA 锁死版本，见仓库根目录 FORK.md。）
+   引导脚本自己去我的资料库里取最新版本的包安装到 ~/.workbuddy/skills/wb-helper。
+   若两个源都失败，原样贴出两条命令的输出并停止；不要自行找第三个下载地址、不要从其他地址安装。
 
 2) 执行 bash ~/.workbuddy/skills/wb-helper/scripts/sandbox_run.sh --quiet
    （--quiet 只保留关键结果；不要去掉它，也不要跑第二次。）

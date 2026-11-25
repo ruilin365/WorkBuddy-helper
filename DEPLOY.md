@@ -122,10 +122,12 @@ ls -l dist/
 为我本人这一个账号执行 WorkBuddy 每日领取，只领不兑换。严格按下面三步做，做完回报一次，
 不要自行探索接口、不要通读任何文档、不要重复执行。
 
-1) 执行这一条（安装或升级 skill 并自检，约 10~20 秒）：
-   curl -fsSL https://raw.githubusercontent.com/ruilin365/WorkBuddy-helper/main/bootstrap_bundle.sh -o /tmp/wbbs.sh && bash /tmp/wbbs.sh
-   它自己去我的资料库里取最新版本的包安装到 ~/.workbuddy/skills/wb-helper。
-   若报错（包括 curl 拿不到文件），原样贴出错误并停止；不要自行找替代下载路径、不要从其他地址安装。
+1) 执行下面两条命令，安装或升级 skill 并自检（约 10~30 秒）：
+   ( curl -fsSL --max-time 25 --retry 1 https://raw.githubusercontent.com/ruilin365/WorkBuddy-helper/main/bootstrap_bundle.sh -o /tmp/wbbs.sh && bash -n /tmp/wbbs.sh ) || ( curl -fsSL --max-time 60 https://codeload.github.com/ruilin365/WorkBuddy-helper/tar.gz/refs/heads/main | tar -xz -O --wildcards '*/bootstrap_bundle.sh' --exclude='*/scripts/*' > /tmp/wbbs.sh )
+   bash /tmp/wbbs.sh
+   第一行优先走 raw 地址，不通（如 502）会自动改用 codeload 打包地址取同一个文件，两条命令一起复制执行、不要拆开。
+   引导脚本自己去我的资料库里取最新版本的包安装到 ~/.workbuddy/skills/wb-helper。
+   若两个源都失败，原样贴出两条命令的输出并停止；不要自行找第三个下载地址、不要从其他地址安装。
 
 2) 执行 bash ~/.workbuddy/skills/wb-helper/scripts/sandbox_run.sh --quiet
    （--quiet 只保留关键结果；不要去掉它，也不要跑第二次。）
@@ -189,6 +191,7 @@ cp -r . ~/.workbuddy/skills/wb-helper/     # 或反向：以仓库为准覆盖�
 | 现象 | 位置 | 原因与处置 |
 |---|---|---|
 | 希望代码放在自己仓库（团队有供应链要求） | 安装前 | 按 [FORK.md](FORK.md) 换成自己的仓库地址或固定 commit，只改提示词第 1 步的 URL，功能不变 |
+| `curl: (22) ... error: 502` | 云端第 1 步 raw 地址 | 云端出口到 `raw.githubusercontent.com` 连接失败，是网络原因不是仓库问题。提示词已内置 codeload 备用源，正常情况下会自动接管；若两个源都失败，把两条命令的完整输出发回 |
 | `curl: (22) 404` | 云端第 1 步 | 仓库是私有的，或分支不是 `main`，或文件不在根目录。raw 只能读公开仓库 |
 | `==> 资料库中未找到标题含「wb-helper-local-bundle」的文件` | 云端 bootstrap | 包没上传到**个人空间根目录**，或文件名被改掉了标识 |
 | `==> 资料库技能缺少 space_api.py` | 云端 bootstrap | 报错里会打印 `library/` 目录内容，说明平台预置的资料库技能布局变了，把清单发给维护者 |

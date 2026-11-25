@@ -77,7 +77,7 @@ https://github.com/ruilin365/WorkBuddy-helper
 
 | 路径 | 说明 |
 |---|---|
-| `bootstrap_bundle.sh` | **云端入口**。一行 curl 即装。从资料库取最新 bundle 并解包到 `~/.workbuddy/skills/wb-helper` |
+| `bootstrap_bundle.sh` | **云端入口**。一行 curl 即装（raw 不通时自动改用 codeload 打包地址）。从资料库取最新 bundle 并解包到 `~/.workbuddy/skills/wb-helper` |
 | `scripts/` | 全部脚本（签到四分支、凭证链路、资料库同步、完整性自检） |
 | `SKILL.md` | 完整手册：原理、踩坑记录、沙盒实测结论、排错 |
 | `DEPLOY.md` | 部署与复现手册，四章从零到通 |
