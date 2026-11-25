@@ -3,7 +3,8 @@
 > 适用场景：希望代码来源、更新时机完全掌握在自己手里。例如团队要求依赖必须放在自己名下的仓库，
 > 或不希望自己的部署受上游仓库后续改动影响。
 >
-> 下面三种方式按省事程度排序，任选一种，都只需改定时任务提示词里的一行 URL。
+> 下面三种方式按省事程度排序，任选一种。前两种需要改两处地址：**定时任务里取 `PROMPT.md` 的那一行**，
+> 以及 **`PROMPT.md` 内部取 `bootstrap_bundle.sh` 的那两行**（只改前者等于没换来源）。
 
 ---
 
@@ -11,9 +12,9 @@
 
 | 现状 | 说明 |
 |---|---|
-| 每天 05:00 / 13:00 会从 `raw.githubusercontent.com/ruilin365/...` 拉一个 `.sh` 并 `bash` 执行 | 确实每次联网取一次引导脚本 |
+| 每天 05:00 / 13:00 先取一次 `PROMPT.md`（执行步骤），再取一次 `bootstrap_bundle.sh`（引导脚本） | 确实每次联网取这两个文件，都来自 `raw.githubusercontent.com/ruilin365/...` |
 | 用 `main` 分支地址时，仓库作者后续提交会带到自己的机器上 | 属实。换成固定 commit 即可让内容恒定 |
-| 这个脚本会不会把凭证发出去 | 不会。脚本全文只有两个网络动作：① 探活平台内部网关 `http://spaceengine.agent-gateway.auth-proxy.local`；② 从**你自己的**资料库下载包并校验 `sha256`。不访问 GitHub，不向任何外部地址发送数据 |
+| 这两个文件会不会把凭证发出去 | 不会。`PROMPT.md` 是纯文字步骤，没有任何外发动作；`bootstrap_bundle.sh` 本身**不访问 GitHub**，全文只有两个网络动作：① 探活平台内部网关 `http://spaceengine.agent-gateway.auth-proxy.local`；② 从**你自己的**资料库下载包并校验 `sha256`。两者都不向任何外部地址发送数据 |
 
 对应办法只有一条：**把「从上游仓库拉」换成「从自己仓库拉」或「锁定到某个固定版本」**。
 
@@ -22,7 +23,9 @@
 ## 二、真正在跑的是哪份代码（重要，别搞错）
 
 ```
-① 仓库 bootstrap_bundle.sh      ← 每天 curl 的就是它，只负责「取包 + 校验 + 解包」
+⓪ 仓库 PROMPT.md                 ← 执行步骤（可取可改，改这里不用动定时任务）
+        ↓ 任务按里面的步骤执行
+① 仓库 bootstrap_bundle.sh      ← 每天 curl 的引导脚本，只负责「取包 + 校验 + 解包」
         ↓ 从你自己的资料库下载
 ② 资料库里的 wb-helper-local-bundle-v<版本>.txt   ← 真正执行的 skill 代码，你本机打包上传的
         ↓ 解包到
@@ -80,17 +83,18 @@ https://raw.githubusercontent.com/ruilin365/WorkBuddy-helper/112dfe9c8e5a658b9a6
 
 ### A-3 改定时任务提示词
 
-打开 05:00 和 13:00 两个**现有**任务，把第 1 步那两行换成（把 `<你的SHA>` 换成你刚复制的 SHA，两处都换）：
+任务提示词里只有一行地址（用来取 `PROMPT.md`）。把 `main` 换成你刚复制的 SHA：
 
 ```
-   ( curl -fsSL --max-time 25 --retry 1 https://raw.githubusercontent.com/ruilin365/WorkBuddy-helper/<你的SHA>/bootstrap_bundle.sh -o /tmp/wbbs.sh && bash -n /tmp/wbbs.sh ) || ( curl -fsSL --max-time 60 https://codeload.github.com/ruilin365/WorkBuddy-helper/tar.gz/<你的SHA> | tar -xz -O --wildcards '*/bootstrap_bundle.sh' --exclude='*/scripts/*' > /tmp/wbbs.sh )
-   bash /tmp/wbbs.sh
+( curl -fsSL --max-time 25 --retry 1 https://raw.githubusercontent.com/ruilin365/WorkBuddy-helper/<你的SHA>/PROMPT.md -o /tmp/wb_prompt.md && [ -s /tmp/wb_prompt.md ] ) || ( curl -fsSL --max-time 60 https://codeload.github.com/ruilin365/WorkBuddy-helper/tar.gz/<你的SHA> | tar -xz -O --wildcards '*/PROMPT.md' > /tmp/wb_prompt.md )
 ```
 
-> 两行一起执行。第一行走 raw 地址，不通时（如 `502`）自动改用 codeload 打包地址取同一个文件。
+**还有一处必须同步改**：仓库里的 `PROMPT.md` 第 1 步含 bootstrap 地址，把那里的 `main` 也换成
+同一个 SHA（raw 段末、codeload 的 `tar.gz/<你的SHA>` 两处）。只改任务里的地址而不管 `PROMPT.md`，
+脚本仍然按 `main` 去取，等于没锁。
 
 **优点**：两分钟搞定，内容立刻固定下来。
-**缺点**：仓库还在别人名下，虽然内容锁死了。
+**缺点**：仓库还在别人名下，虽然内容锁死了；以后想顶到新版本，任务和 `PROMPT.md` 两处都要改。
 
 ---
 
@@ -125,16 +129,21 @@ https://github.com/<你的用户名>/WorkBuddy-helper
 打开 05:00 和 13:00 两个**现有**任务（不要新建），把第 1 步那两行换成（`<你的用户名>` 两处都换）：
 
 ```
-   ( curl -fsSL --max-time 25 --retry 1 https://raw.githubusercontent.com/<你的用户名>/WorkBuddy-helper/main/bootstrap_bundle.sh -o /tmp/wbbs.sh && bash -n /tmp/wbbs.sh ) || ( curl -fsSL --max-time 60 https://codeload.github.com/<你的用户名>/WorkBuddy-helper/tar.gz/refs/heads/main | tar -xz -O --wildcards '*/bootstrap_bundle.sh' --exclude='*/scripts/*' > /tmp/wbbs.sh )
-   bash /tmp/wbbs.sh
+( curl -fsSL --max-time 25 --retry 1 https://raw.githubusercontent.com/<你的用户名>/WorkBuddy-helper/main/PROMPT.md -o /tmp/wb_prompt.md && [ -s /tmp/wb_prompt.md ] ) || ( curl -fsSL --max-time 60 https://codeload.github.com/<你的用户名>/WorkBuddy-helper/tar.gz/refs/heads/main | tar -xz -O --wildcards '*/PROMPT.md' > /tmp/wb_prompt.md )
 ```
 
-只改 `<你的用户名>` 这一段，其余一字不动。
+**还要改一处，否则等于没 fork**：打开你 fork 里的 `PROMPT.md`，把第 1 步两处 bootstrap 地址里的
+`ruilin365` 也换成 `<你的用户名>`（raw 那段和 codeload 那段各一处），提交到你的 `main`。
+不改的话，指令虽然从你仓库读，脚本还是从作者仓库取。
+
+**优点**：仓库在自己名下，来源最清楚；以后改领取步骤只改你 fork 里的 `PROMPT.md`，任务不用动。
+**缺点**：需要多改一处。
 
 ### B-5（可选但推荐）再锁一层 commit
 
-想再稳一层，在 B-4 基础上把你刚写进去的 `main` 换成自己的 commit SHA（取法见「A-1」），
-**两处地址都要换**：raw 那段的路径末段、codeload 那段的 `tar.gz/<你的SHA>`。
+想再稳一层，在 B-4 基础上把你写的 `main` 换成你自己 fork 的 commit SHA（取法见「A-1」，
+取你 fork 的最新提交）。一共四处：任务提示词里取 `PROMPT.md` 的 raw 段末与 `tar.gz/<你的SHA>`，
+`PROMPT.md` 里取 bootstrap 的 raw 段末与 `tar.gz/<你的SHA>`。
 
 这样连你自己误操作改坏仓库都不影响云端。
 
